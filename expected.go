@@ -1,11 +1,11 @@
 package main
 
 import (
-	"net/http"
 	"context"
-	"strconv"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
 )
 
 func contains(arr []string, str string) bool {
@@ -15,6 +15,19 @@ func contains(arr []string, str string) bool {
 		}
 	}
 	return false
+}
+
+func respondJSON(w http.ResponseWriter, data interface{}) {
+	d, _ := json.Marshal(data)
+	w.Write(d)
+}
+
+func (h *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// endpoints
+	switch r.URL.Path {
+	case "/user/create":
+		h.wrapperCreate(w, r)
+	}
 }
 
 func parseCreateParams(r *http.Request) (CreateParams, *ApiError) {
@@ -28,17 +41,15 @@ func parseCreateParams(r *http.Request) (CreateParams, *ApiError) {
 		errorFields = append(errorFields, "Login")
 	}
 
-
 	name := r.FormValue("full_name")
 	params.Name = name
-	
+
 	statusEnum := []string{"user", "admin", "moderator"}
 	if status := r.FormValue("Status"); contains(statusEnum, status) {
 		params.Status = status
 	} else {
 		errorFields = append(errorFields, "Status")
 	}
-	
 
 	if a, err := strconv.Atoi(r.FormValue("Age")); err == nil {
 		params.Age = a
@@ -47,53 +58,44 @@ func parseCreateParams(r *http.Request) (CreateParams, *ApiError) {
 	}
 
 	if len(errorFields) > 0 {
-		return params, &ApiError{Err: fmt.Errorf("invalid fields"),HTTPStatus: http.StatusBadRequest}
+		return params, &ApiError{Err: fmt.Errorf("invalid fields"), HTTPStatus: http.StatusBadRequest}
 	}
 
 	return params, nil
 }
 
-func respondJSON(w http.ResponseWriter, data interface{}) {
-	d, _ := json.Marshal(data)
-	w.Write(d)
-}
-
-func (a *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *MyApi) wrapperCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-	
-	// endpoints
-	switch r.URL.Path {
-	case "/user/create":
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
 
-		var params CreateParams
-		if p, err := parseCreateParams(r); err == nil {
-			params = p 
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 
-		res, err := a.Create(ctx, params)
-		if err == nil {
-			// send success response
-			w.WriteHeader(http.StatusOK)
-			respondJSON(w, res)
-			return
-		}
+	var params CreateParams
+	if p, err := parseCreateParams(r); err == nil {
+		params = p
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-		switch err.(type) {
-		case ApiError:
-			e := err.(ApiError)
-			w.WriteHeader(e.HTTPStatus)
-			w.Write([]byte(e.Error()))
-		
-		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-		}
+	res, err := h.Create(ctx, params)
+	if err == nil {
+		// send success response
+		w.WriteHeader(http.StatusOK)
+		respondJSON(w, res)
+		return
+	}
+
+	switch err.(type) {
+	case ApiError:
+		e := err.(ApiError)
+		w.WriteHeader(e.HTTPStatus)
+		w.Write([]byte(e.Error()))
+
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
 	}
 }
