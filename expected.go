@@ -17,7 +17,7 @@ func contains(arr []string, str string) bool {
 	return false
 }
 
-func parseAndValidate(r *http.Request) (CreateParams, *ApiError) {
+func parseCreateParams(r *http.Request) (CreateParams, *ApiError) {
 	params := CreateParams{}
 
 	errorFields := []string{}
@@ -53,19 +53,35 @@ func parseAndValidate(r *http.Request) (CreateParams, *ApiError) {
 	return params, nil
 }
 
+func respondJSON(w http.ResponseWriter, data interface{}) {
+	d, _ := json.Marshal(data)
+	w.Write(d)
+}
+
 func (a *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
-
+	
+	// endpoints
 	switch r.URL.Path {
 	case "/user/create":
-		params := CreateParams{}
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		var params CreateParams
+		if p, err := parseCreateParams(r); err == nil {
+			params = p 
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
 		res, err := a.Create(ctx, params)
 		if err == nil {
 			// send success response
 			w.WriteHeader(http.StatusOK)
-			d, _ := json.Marshal(res) // TODO
-			w.Write(d)
+			respondJSON(w, res)
 			return
 		}
 
