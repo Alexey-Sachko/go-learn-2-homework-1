@@ -17,10 +17,6 @@ func contains(arr []string, str string) bool {
 	return false
 }
 
-func respondJSON(w http.ResponseWriter, data interface{}) {
-	d, _ := json.Marshal(data)
-	w.Write(d)
-}
 
 func (h *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// endpoints
